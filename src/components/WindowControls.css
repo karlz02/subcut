@@ -1,0 +1,122 @@
+.window-controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  height: 36px;
+  background: var(--bg-primary, #1a1a2e);
+  border-bottom: 1px solid var(--border, #2d3748);
+  padding: 0 8px;
+  user-select: none;
+  cursor: default;
+  -webkit-app-region: drag;
+}
+
+.window-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.window-title {
+  font-size: 13px;
+  color: var(--text, #e2e8f0);
+  font-weight: 500;
+}
+
+.window-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  -webkit-app-region: no-drag;
+}
+
+.window-action-btn {
+  padding: 4px 10px;
+  background: transparent;
+  border: 1px solid var(--border, #4a5568);
+  border-radius: 4px;
+  color: var(--text-secondary, #a0aec0);
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.window-action-btn:hover {
+  background: var(--bg-tertiary, #2d3748);
+  color: var(--text, #e2e8f0);
+}
+
+.window-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  -webkit-app-region: no-drag;
+}
+
+.window-speed select {
+  background: var(--bg-tertiary, #2d3748);
+  color: var(--text, #e2e8f0);
+  border: 1px solid var(--border, #4a5568);
+  border-radius: 3px;
+  padding: 2px 6px;
+  font-size: 12px;
+  font-family: var(--font-mono);
+  cursor: pointer;
+}
+
+.window-export-btn {
+  padding: 4px 12px;
+  background: var(--accent, #4299e1);
+  border: none;
+  border-radius: 4px;
+  color: #fff;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.window-export-btn:hover {
+  background: #3182ce;
+}
+
+.window-buttons {
+  display: flex;
+  gap: 0;
+  -webkit-app-region: no-drag;
+}
+
+.window-btn {
+  width: 36px;
+  height: 32px;
+  border: none;
+  background: transparent;
+  border-radius: 0;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s;
+}
+
+.window-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.window-btn-close:active {
+  background: #ff4a4a;
+}
+
+.window-btn-close:active .btn-icon {
+  color: #fff;
+}
+
+.btn-icon {
+  font-size: 14px;
+  color: var(--text, #e2e8f0);
+  line-height: 1;
+}
+
+.window-btn-close .btn-icon {
+  font-size: 16px;
+  color: var(--text, #e2e8f0);
+}

@@ -1,0 +1,39 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "PowerShell(Get-ChildItem *)",
+      "PowerShell(Get-Command *)",
+      "PowerShell($env:PATH = \"F:\\\\01_软件\\\\02_低频使用\\\\node;$env:PATH\"; Set-Location \"F:\\\\05_字幕\\\\00_字幕工具\\\\01_EchoClip MVP\"; & \"F:\\\\01_软件\\\\02_低频使用\\\\node\\\\npm.cmd\" create vite@latest . -- --template react-ts 2>&1)",
+      "PowerShell($env:PATH = \"F:\\\\01_软件\\\\02_低频使用\\\\node;$env:PATH\"; Set-Location \"F:\\\\05_字幕\\\\00_字幕工具\\\\01_EchoClip MVP\"; & \"F:\\\\01_软件\\\\02_低频使用\\\\node\\\\npm.cmd\" install 2>&1)",
+      "PowerShell($env:PATH = \"F:\\\\01_软件\\\\02_低频使用\\\\node;$env:PATH\"; Set-Location \"F:\\\\05_字幕\\\\00_字幕工具\\\\01_EchoClip MVP\"; & \"F:\\\\01_软件\\\\02_低频使用\\\\node\\\\npx.cmd\" tsc -b --noEmit 2>&1)",
+      "PowerShell($env:PATH = \"F:\\\\01_软件\\\\02_低频使用\\\\node;$env:PATH\"; Set-Location \"F:\\\\05_字幕\\\\00_字幕工具\\\\01_EchoClip MVP\"; & \"F:\\\\01_软件\\\\02_低频使用\\\\node\\\\npx.cmd\" vite --host 2>&1)",
+      "PowerShell(New-Item *)",
+      "PowerShell(Get-ChildItem \"F:\\\\05_字幕\\\\00_字幕工具\\\\01_EchoClip MVP\\\\public\\\\ffmpeg\" | Select-Object Name, @{N='SizeMB';E={[math]::Round\\($_.Length/1MB,1\\)}})",
+      "PowerShell(npm install *)",
+      "PowerShell(npx tsc --noEmit 2>&1)",
+      "PowerShell(npm run *)",
+      "WebFetch(domain:localhost)",
+      "PowerShell(curl *)",
+      "PowerShell(Invoke-WebRequest -Uri http://localhost:5173/ -UseBasicParsing | Select-Object -ExpandProperty Content | Select-Object -First 30)",
+      "PowerShell(rustc *)",
+      "PowerShell(Test-Path *)",
+      "PowerShell(Get-Process *)",
+      "PowerShell(ls \"$env:LOCALAPPDATA\\\\electron\\\\Cache\" 2>&1)",
+      "PowerShell(powershell -NoProfile -Command \"Get-ItemProperty 'HKLM:\\\\SOFTWARE\\\\Microsoft\\\\Windows NT\\\\CurrentVersion\\\\Fonts' | Get-Member -MemberType NoteProperty | Where-Object { $_.Name -notmatch '^PS' } | Select-Object -First 10 -ExpandProperty Name\")",
+      "mcp__ide__getDiagnostics",
+      "PowerShell(reg query *)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:www.npmjs.com)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebFetch(domain:mpv.io)",
+      "WebFetch(domain:registry.npmjs.org)",
+      "WebFetch(domain:api.github.com)",
+      "PowerShell(& \"C:\\\\Program Files\\\\GitHub CLI\\\\gh.exe\" auth status 2>&1)",
+      "PowerShell(winget list *)",
+      "PowerShell($env:GIT_EXEC_PATH = \"F:\\\\git\\\\cmd\"; $git = \"F:\\\\git\\\\cmd\\\\git.exe\"; & $git --version)",
+      "PowerShell($git = \"F:\\\\git\\\\cmd\\\\git.exe\"; cd \"F:\\\\05_字幕\\\\00_字幕工具\\\\01_EchoClip MVP\"; & $git init; & $git remote add origin https://github.com/karlz02/subcut.git; & $git add -A; & $git status)",
+      "PowerShell($git = \"F:\\\\git\\\\cmd\\\\git.exe\"; cd \"F:\\\\05_字幕\\\\00_字幕工具\\\\01_EchoClip MVP\"; & $git add -A; & $git status)"
+    ]
+  }
+}
