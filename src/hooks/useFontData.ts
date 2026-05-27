@@ -16,8 +16,24 @@ export function useFontData(assContent: string | null): Uint8Array[] {
     let cancelled = false;
 
     const loadFonts = async () => {
+      // 安全检查：确保 window 和 API 存在
+      if (typeof window === "undefined") {
+        console.warn("useFontData: window is undefined");
+        return;
+      }
+
       const api = window.fontAPI || window.electronAPI;
-      if (!api?.getFontData) return;
+      
+      // 更清晰的错误提示
+      if (!api) {
+        console.warn("useFontData: fontAPI or electronAPI not available");
+        return;
+      }
+
+      if (!api.getFontData) {
+        console.warn("useFontData: getFontData method not available");
+        return;
+      }
 
       // Extract font names from ASS content (lines starting with "Style:")
       const fontNames = new Set<string>();
@@ -39,7 +55,9 @@ export function useFontData(assContent: string | null): Uint8Array[] {
           if (data && !cancelled) {
             loaded.push(data);
           }
-        } catch { /* font not found, skip */ }
+        } catch (error) { 
+          console.warn(`useFontData: Failed to load font "${name}":`, error);
+        }
       }
 
       if (!cancelled && loaded.length > 0) {

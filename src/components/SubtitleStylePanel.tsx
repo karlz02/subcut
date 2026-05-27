@@ -1,257 +1,275 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React from 'react';
 import type { SubtitleStyle } from '../types';
-import './SubtitleStylePanel.css';
 
-interface Props {
+interface SubtitleStylePanelProps {
   englishStyle: SubtitleStyle;
   chineseStyle: SubtitleStyle;
-  onEnglishStyleChange: (style: SubtitleStyle) => void;
-  onChineseStyleChange: (style: SubtitleStyle) => void;
-  onClose: () => void;
+  updateStyle: (lang: 'english' | 'chinese', updates: Partial<SubtitleStyle>) => void;
 }
 
-const SAFE_FONTS = [
-  'Arial', 'Microsoft YaHei', 'SimHei', 'SimSun', 'KaiTi', 'FangSong',
-  'DengXian', 'Verdana', 'Times New Roman', 'Georgia', 'Consolas'
+const FONT_OPTIONS = [
+  { value: 'Arial', label: 'Arial' },
+  { value: 'Microsoft YaHei', label: '微软雅黑' },
+  { value: 'SimSun', label: '宋体' },
+  { value: 'SimHei', label: '黑体' },
+  { value: 'Helvetica', label: 'Helvetica' },
+  { value: 'Times New Roman', label: 'Times New Roman' },
+  { value: 'PingFang SC', label: '苹方' },
+  { value: 'Noto Sans CJK SC', label: 'Noto Sans CJK' },
 ];
 
-const SubtitleStylePanel: React.FC<Props> = ({
+const StyleEditor: React.FC<{
+  title: string;
+  style: SubtitleStyle;
+  onUpdate: (updates: Partial<SubtitleStyle>) => void;
+}> = ({ title, style, onUpdate }) => {
+  return (
+    <div className="style-editor-section" style={{ marginBottom: 28 }}>
+      <h3 style={{ marginBottom: 14, fontSize: 16, fontWeight: 600, color: '#1f2937' }}>
+        {title}
+      </h3>
+
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: '1fr 1fr',
+          gap: '12px 16px',
+          alignItems: 'start',
+        }}
+      >
+        <div className="form-group" style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          <label style={{ fontSize: 13, color: '#4b5563', fontWeight: 500 }}>字体</label>
+          <select
+            value={style.fontname}
+            onChange={(e) => onUpdate({ fontname: e.target.value })}
+            style={{
+              padding: '6px 8px',
+              borderRadius: 6,
+              border: '1px solid #d1d5db',
+              fontSize: 13,
+              backgroundColor: '#fff',
+            }}
+          >
+            {FONT_OPTIONS.map((f) => (
+              <option key={f.value} value={f.value}>
+                {f.label}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="form-group" style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          <label style={{ fontSize: 13, color: '#4b5563', fontWeight: 500 }}>
+            字号 ({style.fontsize}px)
+          </label>
+          <input
+            type="range"
+            min={12}
+            max={120}
+            step={1}
+            value={style.fontsize}
+            onChange={(e) => onUpdate({ fontsize: Number(e.target.value) })}
+            style={{ width: '100%' }}
+          />
+        </div>
+
+        <div className="form-group" style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          <label style={{ fontSize: 13, color: '#4b5563', fontWeight: 500 }}>主文字颜色</label>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <input
+              type="color"
+              value={style.color1}
+              onChange={(e) => onUpdate({ color1: e.target.value })}
+              style={{ width: 36, height: 28, padding: 0, border: '1px solid #d1d5db', borderRadius: 6, cursor: 'pointer' }}
+            />
+            <input
+              type="text"
+              value={style.color1}
+              onChange={(e) => onUpdate({ color1: e.target.value })}
+              style={{ flex: 1, padding: '6px 8px', borderRadius: 6, border: '1px solid #d1d5db', fontSize: 13, fontFamily: 'monospace' }}
+            />
+          </div>
+        </div>
+
+        <div className="form-group" style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          <label style={{ fontSize: 13, color: '#4b5563', fontWeight: 500 }}>描边颜色</label>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <input
+              type="color"
+              value={style.color3}
+              onChange={(e) => onUpdate({ color3: e.target.value })}
+              style={{ width: 36, height: 28, padding: 0, border: '1px solid #d1d5db', borderRadius: 6, cursor: 'pointer' }}
+            />
+            <input
+              type="text"
+              value={style.color3}
+              onChange={(e) => onUpdate({ color3: e.target.value })}
+              style={{ flex: 1, padding: '6px 8px', borderRadius: 6, border: '1px solid #d1d5db', fontSize: 13, fontFamily: 'monospace' }}
+            />
+          </div>
+        </div>
+
+        <div className="form-group" style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          <label style={{ fontSize: 13, color: '#4b5563', fontWeight: 500 }}>阴影颜色</label>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <input
+              type="color"
+              value={style.color4}
+              onChange={(e) => onUpdate({ color4: e.target.value })}
+              style={{ width: 36, height: 28, padding: 0, border: '1px solid #d1d5db', borderRadius: 6, cursor: 'pointer' }}
+            />
+            <input
+              type="text"
+              value={style.color4}
+              onChange={(e) => onUpdate({ color4: e.target.value })}
+              style={{ flex: 1, padding: '6px 8px', borderRadius: 6, border: '1px solid #d1d5db', fontSize: 13, fontFamily: 'monospace' }}
+            />
+          </div>
+        </div>
+
+        <div className="form-group" style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          <label style={{ fontSize: 13, color: '#4b5563', fontWeight: 500 }}>
+            描边宽度 ({style.outline}px)
+          </label>
+          <input
+            type="range"
+            min={0}
+            max={10}
+            step={0.5}
+            value={style.outline}
+            onChange={(e) => onUpdate({ outline: Number(e.target.value) })}
+            style={{ width: '100%' }}
+          />
+        </div>
+
+        <div className="form-group" style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          <label style={{ fontSize: 13, color: '#4b5563', fontWeight: 500 }}>
+            阴影宽度 ({style.shadow}px)
+          </label>
+          <input
+            type="range"
+            min={0}
+            max={10}
+            step={0.5}
+            value={style.shadow}
+            onChange={(e) => onUpdate({ shadow: Number(e.target.value) })}
+            style={{ width: '100%' }}
+          />
+        </div>
+
+        <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+          <div style={{ display: 'flex', gap: 20, padding: '8px 0' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 13, color: '#374151' }}>
+              <input
+                type="checkbox"
+                checked={style.bold}
+                onChange={(e) => onUpdate({ bold: e.target.checked })}
+                style={{ width: 16, height: 16 }}
+              />
+              <span style={{ fontWeight: style.bold ? 'bold' : 'normal' }}>粗体 (Bold)</span>
+            </label>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 13, color: '#374151' }}>
+              <input
+                type="checkbox"
+                checked={style.italic}
+                onChange={(e) => onUpdate({ italic: e.target.checked })}
+                style={{ width: 16, height: 16 }}
+              />
+              <span style={{ fontStyle: style.italic ? 'italic' : 'normal' }}>斜体 (Italic)</span>
+            </label>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 13, color: '#374151' }}>
+              <input
+                type="checkbox"
+                checked={style.underline}
+                onChange={(e) => onUpdate({ underline: e.target.checked })}
+                style={{ width: 16, height: 16 }}
+              />
+              <span style={{ textDecoration: style.underline ? 'underline' : 'none' }}>下划线 (Underline)</span>
+            </label>
+          </div>
+        </div>
+
+        <div className="form-group" style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          <label style={{ fontSize: 13, color: '#4b5563', fontWeight: 500 }}>左边距 (px)</label>
+          <input
+            type="number"
+            min={0}
+            max={500}
+            value={style.margin_l}
+            onChange={(e) => onUpdate({ margin_l: Number(e.target.value) })}
+            style={{ padding: '6px 8px', borderRadius: 6, border: '1px solid #d1d5db', fontSize: 13 }}
+          />
+        </div>
+
+        <div className="form-group" style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          <label style={{ fontSize: 13, color: '#4b5563', fontWeight: 500 }}>右边距 (px)</label>
+          <input
+            type="number"
+            min={0}
+            max={500}
+            value={style.margin_r}
+            onChange={(e) => onUpdate({ margin_r: Number(e.target.value) })}
+            style={{ padding: '6px 8px', borderRadius: 6, border: '1px solid #d1d5db', fontSize: 13 }}
+          />
+        </div>
+
+        <div className="form-group" style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          <label style={{ fontSize: 13, color: '#4b5563', fontWeight: 500 }}>垂直边距 (px)</label>
+          <input
+            type="number"
+            min={0}
+            max={500}
+            value={style.margin_v}
+            onChange={(e) => onUpdate({ margin_v: Number(e.target.value) })}
+            style={{ padding: '6px 8px', borderRadius: 6, border: '1px solid #d1d5db', fontSize: 13 }}
+          />
+        </div>
+
+        <div className="form-group" style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          <label style={{ fontSize: 13, color: '#4b5563', fontWeight: 500 }}>垂直偏移 (px)</label>
+          <input
+            type="number"
+            min={-300}
+            max={300}
+            value={style.offsetY}
+            onChange={(e) => onUpdate({ offsetY: Number(e.target.value) })}
+            style={{ padding: '6px 8px', borderRadius: 6, border: '1px solid #d1d5db', fontSize: 13 }}
+          />
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const SubtitleStylePanel: React.FC<SubtitleStylePanelProps> = ({
   englishStyle,
   chineseStyle,
-  onEnglishStyleChange,
-  onChineseStyleChange,
-  onClose,
+  updateStyle,
 }) => {
-  const [activeTab, setActiveTab] = useState<'chinese' | 'english'>('chinese');
-
-  const currentStyle = activeTab === 'chinese' ? chineseStyle : englishStyle;
-  const setCurrentStyle = activeTab === 'chinese' ? onChineseStyleChange : onEnglishStyleChange;
-
-  const updateStyle = useCallback((updates: Partial<SubtitleStyle>) => {
-    setCurrentStyle((prev) => ({ ...prev, ...updates }));
-  }, [setCurrentStyle]);
-
-  const fontOptions = useMemo(() =>
-    SAFE_FONTS.map(font => ({
-      value: font,
-      label: font === 'Microsoft YaHei' ? '微软雅黑' : font
-    })),
-  []);
-
-  const previewText = activeTab === 'chinese' ? '这是中文字幕预览' : 'This is English subtitle preview';
-
-  const textStyle = {
-    fontFamily: currentStyle.fontname || 'Arial',
-    fontSize: `${currentStyle.fontsize || 48}px`,
-    color: currentStyle.color1 || '#FFFFFF',
-    textShadow: currentStyle.outline || currentStyle.shadow
-      ? `${currentStyle.outline ? `0 0 ${currentStyle.outline}px ${currentStyle.color3 || '#000000'},` : ''}
-        ${currentStyle.shadow ? `${currentStyle.shadow}px ${currentStyle.shadow}px ${currentStyle.shadow}px ${currentStyle.color4 || '#000000'}` : ''}`
-      : 'none',
-    fontWeight: currentStyle.bold ? 'bold' : 'normal',
-    fontStyle: currentStyle.italic ? 'italic' : 'normal',
-    textDecoration: currentStyle.underline ? 'underline' : 'none',
-    textAlign: 'center' as const,
-    lineHeight: '1.4',
-  };
-
   return (
-    <div className="style-panel">
-      <div className="style-panel-header">
-        <h3>字幕样式</h3>
-        <button onClick={onClose}>✕</button>
-      </div>
+    <div
+      className="subtitle-style-panel"
+      style={{
+        padding: 20,
+        maxWidth: 560,
+        backgroundColor: '#f9fafb',
+        borderRadius: 12,
+        border: '1px solid #e5e7eb',
+      }}
+    >
+      <StyleEditor
+        title="英文字幕样式 (English)"
+        style={englishStyle}
+        onUpdate={(updates) => updateStyle('english', updates)}
+      />
 
-      <div className="style-panel-tabs">
-        <button
-          className={`style-panel-tab${activeTab === 'chinese' ? ' active' : ''}`}
-          onClick={() => setActiveTab('chinese')}
-        >
-          中文字幕
-        </button>
-        <button
-          className={`style-panel-tab${activeTab === 'english' ? ' active' : ''}`}
-          onClick={() => setActiveTab('english')}
-        >
-          英文字幕
-        </button>
-      </div>
+      <div style={{ height: 1, backgroundColor: '#e5e7eb', margin: '20px 0' }} />
 
-      <div className="style-panel-content">
-        {/* 预览区域 */}
-        <div className="style-preview">
-          <div className="style-preview-title">实时预览</div>
-          <div className="style-preview-text" style={textStyle}>
-            {previewText}
-          </div>
-        </div>
-
-        <div className="style-divider"></div>
-
-        {/* 字体设置 */}
-        <div className="style-section">
-          <div className="style-section-title">字体设置</div>
-          
-          <div className="style-row">
-            <label className="style-label">字体</label>
-            <div className="style-control-group">
-              <select
-                className="style-select"
-                value={currentStyle.fontname || 'Arial'}
-                onChange={(e) => updateStyle({ fontname: e.target.value })}
-              >
-                {fontOptions.map(opt => (
-                  <option key={opt.value} value={opt.value}>{opt.label}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          <div className="style-row">
-            <label className="style-label">字号</label>
-            <div className="style-control-group">
-              <input
-                className="style-input-number"
-                type="number"
-                value={currentStyle.fontsize || 48}
-                onChange={(e) => updateStyle({ fontsize: parseInt(e.target.value) })}
-                min={20}
-                max={120}
-              />
-              <span className="style-unit">px</span>
-            </div>
-          </div>
-
-          <div className="style-row">
-            <label className="style-label">颜色</label>
-            <div className="style-control-group">
-              <div className="style-color-picker" style={{ background: currentStyle.color1 || '#FFFFFF' }}>
-                <input
-                  type="color"
-                  value={currentStyle.color1 || '#FFFFFF'}
-                  onChange={(e) => updateStyle({ color1: e.target.value })}
-                />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="style-divider"></div>
-
-        {/* 描边设置 */}
-        <div className="style-section">
-          <div className="style-section-title">描边设置</div>
-          
-          <div className="style-combo-row">
-            <span className="style-combo-label">描边</span>
-            <div className="style-combo-content">
-              <div className="style-combo-color" style={{ background: currentStyle.color3 || '#000000' }}>
-                <input
-                  type="color"
-                  value={currentStyle.color3 || '#000000'}
-                  onChange={(e) => updateStyle({ color3: e.target.value })}
-                />
-              </div>
-              <input
-                className="style-combo-input"
-                type="number"
-                value={currentStyle.outline || 4}
-                onChange={(e) => updateStyle({ outline: parseInt(e.target.value) })}
-                min={0}
-                max={10}
-              />
-              <span className="style-combo-unit">px</span>
-            </div>
-          </div>
-        </div>
-
-        {/* 阴影设置 */}
-        <div className="style-section">
-          <div className="style-section-title">阴影设置</div>
-          
-          <div className="style-combo-row">
-            <span className="style-combo-label">阴影</span>
-            <div className="style-combo-content">
-              <div className="style-combo-color" style={{ background: currentStyle.color4 || '#000000' }}>
-                <input
-                  type="color"
-                  value={currentStyle.color4 || '#000000'}
-                  onChange={(e) => updateStyle({ color4: e.target.value })}
-                />
-              </div>
-              <input
-                className="style-combo-input"
-                type="number"
-                value={currentStyle.shadow || 1}
-                onChange={(e) => updateStyle({ shadow: parseInt(e.target.value) })}
-                min={0}
-                max={10}
-              />
-              <span className="style-combo-unit">px</span>
-            </div>
-          </div>
-        </div>
-
-        <div className="style-divider"></div>
-
-        {/* 文字样式 */}
-        <div className="style-section">
-          <div className="style-section-title">文字样式</div>
-          
-          <div className="style-row">
-            <label className="style-label">样式</label>
-            <div className="style-button-group">
-              <button
-                className={`style-toggle-btn${currentStyle.bold ? ' active' : ''}`}
-                onClick={() => updateStyle({ bold: !currentStyle.bold })}
-                title="粗体"
-              >
-                B
-              </button>
-              <button
-                className={`style-toggle-btn${currentStyle.italic ? ' active' : ''}`}
-                onClick={() => updateStyle({ italic: !currentStyle.italic })}
-                title="斜体"
-              >
-                I
-              </button>
-              <button
-                className={`style-toggle-btn${currentStyle.underline ? ' active' : ''}`}
-                onClick={() => updateStyle({ underline: !currentStyle.underline })}
-                title="下划线"
-              >
-                U
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <div className="style-divider"></div>
-
-        {/* 位置设置 */}
-        <div className="style-section">
-          <div className="style-section-title">位置设置</div>
-          
-          <div className="style-row">
-            <label className="style-label">底部距离</label>
-            <div className="style-control-group">
-              <input
-                className="style-input-number"
-                type="number"
-                value={currentStyle.margin_v || 45}
-                onChange={(e) => updateStyle({ margin_v: parseInt(e.target.value) })}
-                min={10}
-                max={200}
-              />
-              <span className="style-unit">px</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="style-panel-footer">
-        <button className="style-btn-cancel" onClick={onClose}>关闭</button>
-      </div>
+      <StyleEditor
+        title="中文字幕样式 (Chinese)"
+        style={chineseStyle}
+        onUpdate={(updates) => updateStyle('chinese', updates)}
+      />
     </div>
   );
 };

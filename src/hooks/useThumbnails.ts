@@ -75,6 +75,13 @@ export function useThumbnails(
         videoRef.current.pause();
         videoRef.current.removeAttribute("src");
         videoRef.current.load();
+        // 完全移除 DOM 元素，防止内存泄漏
+        videoRef.current.remove();
+        videoRef.current = null;
+      }
+      if (canvasRef.current) {
+        canvasRef.current.remove();
+        canvasRef.current = null;
       }
     };
   }, []);

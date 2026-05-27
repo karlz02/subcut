@@ -1,46 +1,7 @@
 import { useRef, useEffect, forwardRef, useImperativeHandle, useState, useCallback } from "react";
 
-import type { Sentence, SubtitleStyle } from "../types";
-
-function buildSubtitleCSS(style: SubtitleStyle): React.CSSProperties {
-  const outlineW = style.outline ?? 2;
-  const outlineC = style.color3 ?? "#000000";
-  const shadowW = style.shadow ?? 1;
-  const shadowC = style.color4 ?? "#000000";
-
-  const shadows: string[] = [];
-  if (outlineW > 0) {
-    const o = outlineW;
-    shadows.push(
-      `${o}px 0 0 ${outlineC}`,
-      `-${o}px 0 0 ${outlineC}`,
-      `0 ${o}px 0 ${outlineC}`,
-      `0 -${o}px 0 ${outlineC}`,
-      `${o}px ${o}px 0 ${outlineC}`,
-      `-${o}px -${o}px 0 ${outlineC}`,
-      `${o}px -${o}px 0 ${outlineC}`,
-      `-${o}px ${o}px 0 ${outlineC}`,
-    );
-  }
-  if (shadowW > 0) {
-    shadows.push(`${shadowW}px ${shadowW}px ${shadowW}px ${shadowC}`);
-  }
-
-  return {
-    fontFamily: `"${style.fontname}", "Microsoft YaHei", "SimHei", sans-serif`,
-    fontSize: `${style.fontsize}px`,
-    color: style.color1 || "#ffffff",
-    fontWeight: style.bold ? "bold" : "normal",
-    fontStyle: style.italic ? "italic" : "normal",
-    textDecoration: style.underline ? "underline" : "none",
-    textShadow: shadows.length > 0 ? shadows.join(", ") : undefined,
-    WebkitFontSmoothing: "antialiased",
-    MozOsxFontSmoothing: "grayscale",
-    textRendering: "geometricPrecision",
-    lineHeight: 1.3,
-    padding: "2px 6px",
-  };
-}
+import type { Sentence } from "../types";
+import CSSSubtitleRenderer from "./CSSSubtitleRenderer";
 
 interface Props {
   videoSrc: string | null;
@@ -231,47 +192,25 @@ const VideoPlayer = forwardRef<VideoPlayerHandle, Props>(
           }}
           onClick={handleVideoClick}
         />
-        {currentSentence && (
+        {currentSentence && currentSentence.style?.chinese && currentSentence.style?.english && (
           <div
             className="video-subtitles"
             style={{
               position: "absolute",
               left: videoRenderRect.x,
               top: videoRenderRect.y,
-              width: videoRenderRect.width,
-              height: videoRenderRect.height,
-              display: "flex",
-              flexDirection: "column",
-              justifyContent: "flex-end",
-              alignItems: "center",
-              paddingBottom: "20px",
+              width: videoRenderRect.width || "100%",
+              height: videoRenderRect.height || "100%",
               pointerEvents: "none",
               zIndex: 10,
             }}
           >
-            {currentSentence.chineseText && (
-              <div
-                className="video-subtitle video-subtitle-cn"
-                style={{
-                  ...buildSubtitleCSS(currentSentence.style.chinese),
-                  transform: `translateY(${currentSentence.style.chinese.offsetY}px)`,
-                }}
-              >
-                {currentSentence.chineseText}
-              </div>
-            )}
-            {currentSentence.englishText && (
-              <div
-                className="video-subtitle video-subtitle-en"
-                style={{
-                  ...buildSubtitleCSS(currentSentence.style.english),
-                  marginTop: "4px",
-                  transform: `translateY(${currentSentence.style.english.offsetY}px)`,
-                }}
-              >
-                {currentSentence.englishText}
-              </div>
-            )}
+            <CSSSubtitleRenderer
+              englishText={currentSentence.englishText || ""}
+              chineseText={currentSentence.chineseText || ""}
+              englishStyle={currentSentence.style.english}
+              chineseStyle={currentSentence.style.chinese}
+            />
           </div>
         )}
       </div>

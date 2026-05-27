@@ -104,26 +104,36 @@ export function generateASS(sentences: Sentence[]): string {
     name: string;
   }
   
-  const enStyles: StyleRecord[] = [];
-  const cnStyles: StyleRecord[] = [];
+  // 使用 Map 替代数组查找，提高性能
+  const enStylesMap = new Map<string, StyleRecord>();
+  const cnStylesMap = new Map<string, StyleRecord>();
+  
+  // 生成样式的唯一哈希键
+  const generateStyleKey = (style: SubtitleStyle): string => {
+    return `${style.fontname}|${style.fontsize}|${style.color1}|${style.color3}|${style.color4}|${style.bold}|${style.italic}|${style.underline}|${style.outline}|${style.shadow}|${style.margin_l}|${style.margin_r}|${style.margin_v}|${style.offsetY}`;
+  };
   
   const getEnStyleName = (style: SubtitleStyle): string => {
-    const key = JSON.stringify(style);
-    const existing = enStyles.find(s => JSON.stringify(s.style) === key);
+    const key = generateStyleKey(style);
+    const existing = enStylesMap.get(key);
     if (existing) return existing.name;
-    const name = `EchoCut-EN-${enStyles.length}`;
-    enStyles.push({ style, name });
+    const name = `EchoCut-EN-${enStylesMap.size}`;
+    enStylesMap.set(key, { style, name });
     return name;
   };
   
   const getCnStyleName = (style: SubtitleStyle): string => {
-    const key = JSON.stringify(style);
-    const existing = cnStyles.find(s => JSON.stringify(s.style) === key);
+    const key = generateStyleKey(style);
+    const existing = cnStylesMap.get(key);
     if (existing) return existing.name;
-    const name = `EchoCut-CN-${cnStyles.length}`;
-    cnStyles.push({ style, name });
+    const name = `EchoCut-CN-${cnStylesMap.size}`;
+    cnStylesMap.set(key, { style, name });
     return name;
   };
+  
+  // 将 Map 转换为数组用于后续遍历
+  const enStyles = () => Array.from(enStylesMap.values());
+  const cnStyles = () => Array.from(cnStylesMap.values());
 
   // Pre-populate styles by iterating through all sentences
   for (const s of sentences) {
@@ -134,8 +144,8 @@ export function generateASS(sentences: Sentence[]): string {
   lines.push("[V4+ Styles]");
   lines.push("Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding");
   
-  enStyles.forEach(record => lines.push(buildStyleLine(record.name, record.style)));
-  cnStyles.forEach(record => lines.push(buildStyleLine(record.name, record.style)));
+  enStyles().forEach(record => lines.push(buildStyleLine(record.name, record.style)));
+  cnStyles().forEach(record => lines.push(buildStyleLine(record.name, record.style)));
   lines.push("");
 
   // ── Events ──

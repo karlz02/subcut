@@ -38,15 +38,27 @@ export default function SentenceEditorModal({
   const [progressHover, setProgressHover] = useState(false);
   const progressRef = useRef<HTMLDivElement>(null);
 
-  
+  // 用于阻断重复初始化的 ref
+  const initDoneRef = useRef(false);
 
-  // Sync on sentence change
+  // Sync on sentence change - 使用 ref 阻断重复初始化
   useEffect(() => {
-    setEnglishText(sentence.englishText);
-    setChineseText(sentence.chineseText);
-    setEnStyle({ ...sentence.style.english });
-    setCnStyle({ ...sentence.style.chinese });
+    // 只在第一次打开或切换句子时初始化
+    if (!initDoneRef.current) {
+      initDoneRef.current = true;
+      setEnglishText(sentence.englishText);
+      setChineseText(sentence.chineseText);
+      setEnStyle({ ...sentence.style.english });
+      setCnStyle({ ...sentence.style.chinese });
+    }
   }, [sentence.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // 重置初始化标记（弹窗关闭时）
+  useEffect(() => {
+    if (!playing && !showStylePanel) {
+      initDoneRef.current = false;
+    }
+  }, [playing, showStylePanel]);
 
   // Save text on blur
   const saveText = useCallback(() => {
@@ -56,10 +68,15 @@ export default function SentenceEditorModal({
     if (Object.keys(updates).length > 0) onUpdate(sentence.id, updates);
   }, [englishText, chineseText, sentence.id, sentence.englishText, sentence.chineseText, onUpdate]);
 
-  // Save style changes via useEffect to avoid rendering issues
-  useEffect(() => {
-    onUpdate(sentence.id, { style: { english: enStyle, chinese: cnStyle } });
-  }, [sentence.id, enStyle, cnStyle, onUpdate]);
+  // 合并保存：同时保存文本和样式，避免数据不一致
+  const saveAll = useCallback(() => {
+    const updates: Partial<Sentence> = {
+      style: { english: enStyle, chinese: cnStyle },
+    };
+    if (englishText !== sentence.englishText) updates.englishText = englishText;
+    if (chineseText !== sentence.chineseText) updates.chineseText = chineseText;
+    if (Object.keys(updates).length > 0) onUpdate(sentence.id, updates);
+  }, [englishText, chineseText, enStyle, cnStyle, sentence.id, sentence.englishText, sentence.chineseText, onUpdate]);
 
   // Video AB Loop + time tracking
   useEffect(() => {
@@ -157,7 +174,7 @@ export default function SentenceEditorModal({
           </div>
           <div className="modal-header-right">
             <button className={`modal-style-btn${showStylePanel ? " active" : ""}`} onClick={() => setShowStylePanel(!showStylePanel)}>样式</button>
-            <button className="modal-close-btn" onClick={onClose}>✕</button>
+            <button className="modal-close-btn" onClick={() => { saveAll(); onClose(); }}>✕</button>
           </div>
         </div>
 
@@ -175,33 +192,8 @@ export default function SentenceEditorModal({
             <CSSSubtitleRenderer
               englishText={englishText || ""}
               chineseText={chineseText || ""}
-              englishStyle={{
-                fontFamily: enStyle.fontname,
-                fontSize: enStyle.fontsize,
-                color: enStyle.color1,
-                outlineColor: enStyle.color3,
-                outlineWidth: enStyle.outline,
-                shadowColor: enStyle.color4,
-                shadowWidth: enStyle.shadow,
-                bold: enStyle.bold,
-                italic: enStyle.italic,
-                underline: enStyle.underline,
-                marginV: enStyle.margin_v,
-              }}
-              chineseStyle={{
-                fontFamily: cnStyle.fontname,
-                fontSize: cnStyle.fontsize,
-                color: cnStyle.color1,
-                outlineColor: cnStyle.color3,
-                outlineWidth: cnStyle.outline,
-                shadowColor: cnStyle.color4,
-                shadowWidth: cnStyle.shadow,
-                bold: cnStyle.bold,
-                italic: cnStyle.italic,
-                underline: cnStyle.underline,
-                marginV: cnStyle.margin_v,
-              }}
-              visible={true}
+              englishStyle={enStyle}
+              chineseStyle={cnStyle}
             />
             {/* Bilibili-style hidden progress bar */}
             <div
@@ -237,9 +229,13 @@ export default function SentenceEditorModal({
             <SubtitleStylePanel
               englishStyle={enStyle}
               chineseStyle={cnStyle}
-              onEnglishStyleChange={setEnStyle}
-              onChineseStyleChange={setCnStyle}
-              onClose={() => setShowStylePanel(false)}
+              updateStyle={(lang, updates) => {
+                if (lang === 'english') {
+                  setEnStyle((prev) => ({ ...prev, ...updates }));
+                } else {
+                  setCnStyle((prev) => ({ ...prev, ...updates }));
+                }
+              }}
             />
           )}
         </div>
@@ -272,7 +268,7 @@ export default function SentenceEditorModal({
 
         {/* Bottom Bar */}
         <div className="modal-bottom">
-          <button className="modal-submit-btn" onClick={() => { saveText(); onSubmitAndNext(); }}>
+          <button className="modal-submit-btn" onClick={() => { saveAll(); onSubmitAndNext(); }}>
             提交并下一句
           </button>
         </div>

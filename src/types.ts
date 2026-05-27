@@ -56,7 +56,8 @@ export interface Sentence {
   id: string;
   start: number;
   end: number;
-  text: string;         // legacy, kept for compat
+  /** @deprecated Use englishText or chineseText instead */
+  text: string;
   englishText: string;
   chineseText: string;
   style: {

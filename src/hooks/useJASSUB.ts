@@ -37,11 +37,23 @@ export function useJASSUB(
 
     jassub.ready.then(() => {
       jassubRef.current = jassub;
+    }).catch((error) => {
+      console.error("useJASSUB: Failed to initialize JASSUB:", error);
+      // 清理可能创建的资源
+      try {
+        jassub.destroy();
+      } catch (e) {
+        console.warn("useJASSUB: Error during cleanup after initialization failure:", e);
+      }
     });
 
     return () => {
       if (jassubRef.current) {
-        jassubRef.current.destroy();
+        try {
+          jassubRef.current.destroy();
+        } catch (error) {
+          console.warn("useJASSUB: Error during cleanup:", error);
+        }
         jassubRef.current = null;
       }
     };
