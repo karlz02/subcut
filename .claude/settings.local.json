@@ -33,7 +33,12 @@
       "PowerShell(winget list *)",
       "PowerShell($env:GIT_EXEC_PATH = \"F:\\\\git\\\\cmd\"; $git = \"F:\\\\git\\\\cmd\\\\git.exe\"; & $git --version)",
       "PowerShell($git = \"F:\\\\git\\\\cmd\\\\git.exe\"; cd \"F:\\\\05_字幕\\\\00_字幕工具\\\\01_EchoClip MVP\"; & $git init; & $git remote add origin https://github.com/karlz02/subcut.git; & $git add -A; & $git status)",
-      "PowerShell($git = \"F:\\\\git\\\\cmd\\\\git.exe\"; cd \"F:\\\\05_字幕\\\\00_字幕工具\\\\01_EchoClip MVP\"; & $git add -A; & $git status)"
+      "PowerShell($git = \"F:\\\\git\\\\cmd\\\\git.exe\"; cd \"F:\\\\05_字幕\\\\00_字幕工具\\\\01_EchoClip MVP\"; & $git add -A; & $git status)",
+      "PowerShell($git = \"F:\\\\git\\\\cmd\\\\git.exe\"; cd \"F:\\\\05_字幕\\\\00_字幕工具\\\\01_EchoClip MVP\"; & $git commit -m \"Initial commit\"; & $git branch -M main; & $git push -u origin main 2>&1)",
+      "PowerShell([Environment]::SetEnvironmentVariable\\(\"Path\", [Environment]::GetEnvironmentVariable\\(\"Path\", \"Machine\"\\) + \";F:\\\\git\\\\cmd;F:\\\\git\\\\bin\", \"Machine\"\\))",
+      "PowerShell($current = [Environment]::GetEnvironmentVariable\\(\"Path\", \"User\"\\); [Environment]::SetEnvironmentVariable\\(\"Path\", $current + \";F:\\\\git\\\\cmd;F:\\\\git\\\\bin\", \"User\"\\); Write-Host \"Done\")",
+      "PowerShell(Select-String *)",
+      "WebFetch(domain:www.cnblogs.com)"
     ]
   }
 }

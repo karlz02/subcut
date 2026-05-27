@@ -1,6 +1,46 @@
 import { useRef, useEffect, forwardRef, useImperativeHandle, useState, useCallback } from "react";
 
-import type { Sentence } from "../types";
+import type { Sentence, SubtitleStyle } from "../types";
+
+function buildSubtitleCSS(style: SubtitleStyle): React.CSSProperties {
+  const outlineW = style.outline ?? 2;
+  const outlineC = style.color3 ?? "#000000";
+  const shadowW = style.shadow ?? 1;
+  const shadowC = style.color4 ?? "#000000";
+
+  const shadows: string[] = [];
+  if (outlineW > 0) {
+    const o = outlineW;
+    shadows.push(
+      `${o}px 0 0 ${outlineC}`,
+      `-${o}px 0 0 ${outlineC}`,
+      `0 ${o}px 0 ${outlineC}`,
+      `0 -${o}px 0 ${outlineC}`,
+      `${o}px ${o}px 0 ${outlineC}`,
+      `-${o}px -${o}px 0 ${outlineC}`,
+      `${o}px -${o}px 0 ${outlineC}`,
+      `-${o}px ${o}px 0 ${outlineC}`,
+    );
+  }
+  if (shadowW > 0) {
+    shadows.push(`${shadowW}px ${shadowW}px ${shadowW}px ${shadowC}`);
+  }
+
+  return {
+    fontFamily: `"${style.fontname}", "Microsoft YaHei", "SimHei", sans-serif`,
+    fontSize: `${style.fontsize}px`,
+    color: style.color1 || "#ffffff",
+    fontWeight: style.bold ? "bold" : "normal",
+    fontStyle: style.italic ? "italic" : "normal",
+    textDecoration: style.underline ? "underline" : "none",
+    textShadow: shadows.length > 0 ? shadows.join(", ") : undefined,
+    WebkitFontSmoothing: "antialiased",
+    MozOsxFontSmoothing: "grayscale",
+    textRendering: "geometricPrecision",
+    lineHeight: 1.3,
+    padding: "2px 6px",
+  };
+}
 
 interface Props {
   videoSrc: string | null;
@@ -191,9 +231,8 @@ const VideoPlayer = forwardRef<VideoPlayerHandle, Props>(
           }}
           onClick={handleVideoClick}
         />
-        {/* Subtitle Overlay - positioned on actual video render area */}
         {currentSentence && (
-          <div 
+          <div
             className="video-subtitles"
             style={{
               position: "absolute",
@@ -210,38 +249,27 @@ const VideoPlayer = forwardRef<VideoPlayerHandle, Props>(
               zIndex: 10,
             }}
           >
+            {currentSentence.chineseText && (
+              <div
+                className="video-subtitle video-subtitle-cn"
+                style={{
+                  ...buildSubtitleCSS(currentSentence.style.chinese),
+                  transform: `translateY(${currentSentence.style.chinese.offsetY}px)`,
+                }}
+              >
+                {currentSentence.chineseText}
+              </div>
+            )}
             {currentSentence.englishText && (
               <div
                 className="video-subtitle video-subtitle-en"
                 style={{
-                  fontFamily: currentSentence.style.english.fontname || "Arial",
-                  fontSize: `${currentSentence.style.english.fontsize}px`,
-                  color: currentSentence.style.english.color1 || "#ffffff",
-                  fontWeight: currentSentence.style.english.bold ? "bold" : "normal",
-                  fontStyle: currentSentence.style.english.italic ? "italic" : "normal",
-                  textDecoration: currentSentence.style.english.underline ? "underline" : "none",
+                  ...buildSubtitleCSS(currentSentence.style.english),
                   marginTop: "4px",
                   transform: `translateY(${currentSentence.style.english.offsetY}px)`,
                 }}
               >
                 {currentSentence.englishText}
-              </div>
-            )}
-            {currentSentence.chineseText && (
-              <div
-                className="video-subtitle video-subtitle-cn"
-                style={{
-                  fontFamily: currentSentence.style.chinese.fontname || "SimHei",
-                  fontSize: `${currentSentence.style.chinese.fontsize}px`,
-                  color: currentSentence.style.chinese.color1 || "#ffffff",
-                  fontWeight: currentSentence.style.chinese.bold ? "bold" : "normal",
-                  fontStyle: currentSentence.style.chinese.italic ? "italic" : "normal",
-                  textDecoration: currentSentence.style.chinese.underline ? "underline" : "none",
-                  marginTop: "4px",
-                  transform: `translateY(${currentSentence.style.chinese.offsetY}px)`,
-                }}
-              >
-                {currentSentence.chineseText}
               </div>
             )}
           </div>
