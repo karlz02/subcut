@@ -1,26 +1,42 @@
-import { useRef } from "react";
+import { useRef, useState, useEffect } from "react";
 import "./WindowControls.css";
 
 interface Props {
   hasVideo: boolean;
+  videoName: string | null;
   sentenceCount: number;
+  isDirty: boolean;
   playbackRate: number;
+  showSafeArea: boolean;
   onFileSelect: (file: File) => void;
   onNewFile: () => void;
   onExport: () => void;
   onPlaybackRateChange: (rate: number) => void;
+  onToggleSafeArea: () => void;
+  onSaveProject: () => void;
+  onOpenProject: () => void;
+  onSaveProjectAs: () => void;
 }
 
 export default function WindowControls({
   hasVideo,
+  videoName,
   sentenceCount,
+  isDirty,
   playbackRate,
+  showSafeArea,
   onFileSelect,
   onNewFile,
   onExport,
   onPlaybackRateChange,
+  onToggleSafeArea,
+  onSaveProject,
+  onOpenProject,
+  onSaveProjectAs,
 }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
+  const [showProjectMenu, setShowProjectMenu] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
 
   const handleMinimize = () => {
     (window as any).electron?.minimize();
@@ -42,9 +58,26 @@ export default function WindowControls({
     e.target.value = "";
   };
 
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    if (!showProjectMenu) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setShowProjectMenu(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [showProjectMenu]);
+
+  const handleProjectAction = (action: () => void) => {
+    action();
+    setShowProjectMenu(false);
+  };
+
   return (
     <div className="window-controls" onMouseDown={(e) => {
-      if ((e.target as HTMLElement).closest(".window-actions, .window-buttons, select, button")) {
+      if ((e.target as HTMLElement).closest(".window-actions, .window-buttons, select, button, .project-menu-container")) {
         return;
       }
       (window as any).electron?.drag();
@@ -68,11 +101,58 @@ export default function WindowControls({
               新视频
             </button>
           )}
+          <div className="project-menu-container" ref={menuRef}>
+            <button
+              className="window-action-btn"
+              onClick={() => setShowProjectMenu(!showProjectMenu)}
+            >
+              工程
+            </button>
+            {showProjectMenu && (
+              <div className="project-dropdown">
+                <button
+                  className="project-dropdown-item"
+                  onClick={() => handleProjectAction(onOpenProject)}
+                >
+                  打开工程
+                </button>
+                <button
+                  className="project-dropdown-item"
+                  onClick={() => handleProjectAction(onSaveProject)}
+                >
+                  保存工程
+                </button>
+                <button
+                  className="project-dropdown-item"
+                  onClick={() => handleProjectAction(onSaveProjectAs)}
+                >
+                  另存为（含视频）
+                </button>
+              </div>
+            )}
+          </div>
         </div>
+        {(hasVideo || videoName) && (
+          <div className="window-project-meta" title={videoName ?? "未命名视频"}>
+            <span className="window-project-name">{videoName ?? "未命名视频"}</span>
+            <span className="window-project-count">{sentenceCount} 句</span>
+            {isDirty && <span className="window-dirty-badge">未保存</span>}
+          </div>
+        )}
       </div>
 
       {/* Right side: Playback rate, export button and window controls */}
       <div className="window-right">
+        {hasVideo && (
+          <button
+            type="button"
+            className={`window-action-btn window-safe-area-btn${showSafeArea ? " active" : ""}`}
+            onClick={onToggleSafeArea}
+            title="显示/隐藏字幕安全区"
+          >
+            安全区
+          </button>
+        )}
         {hasVideo && (
           <label className="window-speed">
             <select

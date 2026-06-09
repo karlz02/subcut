@@ -7,6 +7,7 @@ const THUMB_H = 180;
 // Desired pixel width per thumbnail cell
 const TARGET_CELL_PX_MIN = 80;
 const TARGET_CELL_PX_MAX = 160;
+const LEADING_THUMB_COUNT = 4;
 
 // Choose interval so each cell is ~TARGET_CELL_PX wide
 function getIntervalForZoom(pps: number): number {
@@ -92,7 +93,10 @@ export function useThumbnails(
     setProgress(0);
     setGenerating(false);
     pendingRef.current.clear();
-    if (abortRef.current) abortRef.current.abort();
+    if (abortRef.current) {
+      abortRef.current.abort();
+      abortRef.current = null;
+    }
   }, [videoSrc, reloadKey]);
 
   // Current interval based on zoom
@@ -100,35 +104,66 @@ export function useThumbnails(
 
   // Generate a single thumbnail
   const generateOne = useCallback(
-    async (video: HTMLVideoElement, canvas: HTMLCanvasElement, time: number): Promise<[string, string] | null> => {
+    async (
+      video: HTMLVideoElement,
+      canvas: HTMLCanvasElement,
+      time: number,
+      signal?: AbortSignal
+    ): Promise<[string, string] | null> => {
       const ctx = canvas.getContext("2d");
       if (!ctx) return null;
 
+      // 检查是否已取消
+      if (signal?.aborted) return null;
+
+      const maxSeekTime = Math.max(0, (video.duration || time) - 0.05);
+      const targetTime = Math.max(0, Math.min(time, maxSeekTime));
       const key = `${Math.round(time * 1000)}`;
 
       return new Promise((resolve) => {
-        const timeout = setTimeout(() => {
-          video.removeEventListener("seeked", onSeeked);
-          video.removeEventListener("loadeddata", onLoadedData);
-          video.removeEventListener("timeupdate", onTimeUpdate);
-          resolve(null);
-        }, 3000);
+        let settled = false;
 
-        const captureFrame = () => {
+        const finish = (result: [string, string] | null) => {
+          if (settled) return;
+          settled = true;
+          cleanup();
+          resolve(result);
+        };
+
+        // 监听取消信号
+        const onAbort = () => {
+          finish(null);
+        };
+        signal?.addEventListener("abort", onAbort);
+
+        const cleanup = () => {
           clearTimeout(timeout);
           video.removeEventListener("seeked", onSeeked);
           video.removeEventListener("loadeddata", onLoadedData);
           video.removeEventListener("timeupdate", onTimeUpdate);
+          signal?.removeEventListener("abort", onAbort);
+        };
+
+        const timeout = setTimeout(() => {
+          finish(null);
+        }, 3000);
+
+        const captureFrame = () => {
+          if (settled) return;
           const dpr = window.devicePixelRatio || 1;
-          ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-          ctx.drawImage(video, 0, 0, THUMB_W, THUMB_H);
-          const dataUrl = canvas.toDataURL("image/jpeg", 0.7);
-          resolve([key, dataUrl]);
+          try {
+            ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+            ctx.drawImage(video, 0, 0, THUMB_W, THUMB_H);
+            const dataUrl = canvas.toDataURL("image/jpeg", 0.7);
+            finish([key, dataUrl]);
+          } catch {
+            finish(null);
+          }
         };
 
         const onSeeked = () => {
           // For time 0, we need to wait for the first frame to be ready
-          if (time === 0 && video.readyState < 2) {
+          if (targetTime === 0 && video.readyState < 2) {
             // Not enough data yet, wait for loadeddata
             return;
           }
@@ -137,12 +172,14 @@ export function useThumbnails(
 
         const onLoadedData = () => {
           // Frame at time 0 is now ready
-          captureFrame();
+          if (Math.abs(video.currentTime - targetTime) < 0.05) {
+            captureFrame();
+          }
         };
 
         const onTimeUpdate = () => {
           // For time 0, timeupdate can also indicate frame is ready
-          if (time === 0 && video.currentTime >= 0) {
+          if (targetTime === 0 && video.currentTime >= 0) {
             captureFrame();
           }
         };
@@ -150,7 +187,20 @@ export function useThumbnails(
         video.addEventListener("seeked", onSeeked);
         video.addEventListener("loadeddata", onLoadedData);
         video.addEventListener("timeupdate", onTimeUpdate);
-        video.currentTime = time;
+
+        const alreadyAtTarget =
+          video.readyState >= 2 && Math.abs(video.currentTime - targetTime) < 0.02;
+
+        try {
+          video.currentTime = targetTime;
+        } catch {
+          finish(null);
+          return;
+        }
+
+        if (alreadyAtTarget) {
+          requestAnimationFrame(captureFrame);
+        }
       });
     },
     []
@@ -181,15 +231,32 @@ export function useThumbnails(
         endTime = Math.min(duration, snapToGrid(visibleEndTime + bufferSec, interval) + interval);
       }
 
+      if (abortRef.current) {
+        abortRef.current.abort();
+        abortRef.current = null;
+        pendingRef.current.clear();
+      }
+
       // Find which cells are missing
-      const missingTimes: number[] = [];
-      for (let t = startTime; t < endTime; t += interval) {
-        const snapped = snapToGrid(t, interval);
+      const missingTimeSet = new Set<number>();
+      const addMissingTime = (time: number) => {
+        const snapped = snapToGrid(time, interval);
+        if (snapped < 0 || snapped > duration) return;
         const key = `${Math.round(snapped * 1000)}`;
         if (!thumbCache.has(key) && !pendingRef.current.has(key)) {
-          missingTimes.push(snapped);
+          missingTimeSet.add(snapped);
         }
+      };
+
+      for (let t = startTime; t < endTime; t += interval) {
+        addMissingTime(t);
       }
+
+      for (let i = 0; i < LEADING_THUMB_COUNT; i++) {
+        addMissingTime(i * interval);
+      }
+
+      const missingTimes = Array.from(missingTimeSet).sort((a, b) => a - b);
 
       if (missingTimes.length === 0) return;
 
@@ -198,8 +265,6 @@ export function useThumbnails(
         pendingRef.current.add(`${Math.round(t * 1000)}`);
       }
 
-      // Abort previous generation
-      if (abortRef.current) abortRef.current.abort();
       const controller = new AbortController();
       abortRef.current = controller;
 
@@ -229,6 +294,10 @@ export function useThumbnails(
             }
           });
         } catch {
+          for (const t of missingTimes) {
+            pendingRef.current.delete(`${Math.round(t * 1000)}`);
+          }
+          if (abortRef.current === controller) abortRef.current = null;
           setGenerating(false);
           return;
         }
@@ -242,7 +311,7 @@ export function useThumbnails(
 
       for (const t of missingTimes) {
         if (controller.signal.aborted) break;
-        const result = await generateOne(video, canvas, t);
+        const result = await generateOne(video, canvas, t, controller.signal);
         if (result) {
           newEntries.set(result[0], result[1]);
         }
@@ -270,12 +339,16 @@ export function useThumbnails(
         setGenerating(false);
         setProgress(1);
       }
+
+      if (abortRef.current === controller) {
+        abortRef.current = null;
+      }
     };
 
     loadVideoAndGenerate();
 
     return () => { abortRef.current?.abort(); };
-  }, [videoSrc, duration, pps, interval, visibleStartTime, visibleEndTime, generateOne, reloadKey, generateAll]);
+  }, [videoSrc, duration, pps, interval, visibleStartTime, visibleEndTime, generateOne, reloadKey, generateAll, thumbCache]);
 
   // Build cell array covering the full track
   const getCellThumbs = useCallback((): CellThumb[] => {

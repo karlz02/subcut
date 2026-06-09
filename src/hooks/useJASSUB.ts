@@ -2,12 +2,15 @@ import { useEffect, useRef } from "react";
 import type { RefObject } from "react";
 import JASSUB from "jassub";
 
+const EMPTY_FONTS: Array<string | Uint8Array> = [];
+
 export function useJASSUB(
   videoRef: RefObject<HTMLVideoElement | null>,
   canvasRef: RefObject<HTMLCanvasElement | null>,
   assContent: string | null,
   videoSrc: string,
   enabled: boolean = true,
+  fonts: Array<string | Uint8Array> = EMPTY_FONTS,
 ) {
   const jassubRef = useRef<JASSUB | null>(null);
 
@@ -31,8 +34,8 @@ export function useJASSUB(
       subContent: assContent,
       workerUrl: "/jassub/jassub-worker.js",
       wasmUrl: "/jassub/jassub-worker.wasm",
-      modernWasm: true,
-      asyncRender: true,
+      modernWasmUrl: "/jassub/jassub-worker.wasm",
+      fonts,
     });
 
     jassub.ready.then(() => {
@@ -57,5 +60,5 @@ export function useJASSUB(
         jassubRef.current = null;
       }
     };
-  }, [videoRef, canvasRef, assContent, videoSrc, enabled]);
+  }, [videoRef, canvasRef, assContent, videoSrc, enabled, fonts]);
 }

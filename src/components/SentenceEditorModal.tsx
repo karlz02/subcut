@@ -1,4 +1,4 @@
-import { useRef, useEffect, useState, useCallback, type MouseEvent } from "react";
+import { useRef, useEffect, useState, useCallback, type MouseEvent, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import type { Sentence, SubtitleStyle, StylePreset } from "../types";
 import { formatTimeCompact } from "../utils/timeFormat";
 import CSSSubtitleRenderer from "./CSSSubtitleRenderer";
@@ -12,22 +12,75 @@ interface Props {
   stylePresets: StylePreset[];
   onUpdate: (id: string, updates: Partial<Sentence>) => void;
   onClose: () => void;
+  onSubmitAndPrev: () => void;
   onSubmitAndNext: () => void;
-  onSavePreset: (name: string, english: SubtitleStyle, chinese: SubtitleStyle) => void;
+  onSavePreset: (preset: StylePreset) => void;
   onDeletePreset: (id: string) => void;
 }
 
+const STYLE_PANEL_WIDTH = 500;
+const STYLE_PANEL_RIGHT_MARGIN = 24;
+const STYLE_PANEL_TOP = 60;
+
 export default function SentenceEditorModal({
   sentence, sentences, videoSrc, stylePresets,
-  onUpdate, onClose, onSubmitAndNext, onSavePreset, onDeletePreset,
+  onUpdate, onClose, onSubmitAndPrev, onSubmitAndNext, onSavePreset, onDeletePreset,
 }: Props) {
+  const modalRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const [playing, setPlaying] = useState(false);
   const [showStylePanel, setShowStylePanel] = useState(false);
-  const [presetName, setPresetName] = useState("");
+
+  // 样式面板拖动状态
+  const [panelPos, setPanelPos] = useState({ x: 20, y: 60 });
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+
+  const getRightPanelPosition = useCallback(() => {
+    const modalWidth = modalRef.current?.clientWidth ?? Math.min(window.innerWidth * 0.95, 1400);
+    return {
+      x: Math.max(STYLE_PANEL_RIGHT_MARGIN, modalWidth - STYLE_PANEL_WIDTH - STYLE_PANEL_RIGHT_MARGIN),
+      y: STYLE_PANEL_TOP,
+    };
+  }, []);
+
+  const handleToggleStylePanel = useCallback(() => {
+    if (showStylePanel) {
+      setShowStylePanel(false);
+      return;
+    }
+    setPanelPos(getRightPanelPosition());
+    setShowStylePanel(true);
+  }, [getRightPanelPosition, showStylePanel]);
+
+  // 拖动开始
+  const handleDragStart = (e: MouseEvent) => {
+    if (e.target !== e.currentTarget) return;
+    setIsDragging(true);
+    setDragStart({
+      x: e.clientX - panelPos.x,
+      y: e.clientY - panelPos.y,
+    });
+    e.preventDefault();
+  };
+
+  // 拖动中
+  const handleDragMove = useCallback((e: MouseEvent) => {
+    if (!isDragging) return;
+    setPanelPos({
+      x: e.clientX - dragStart.x,
+      y: e.clientY - dragStart.y,
+    });
+    e.preventDefault();
+  }, [isDragging, dragStart]);
+
+  // 拖动结束
+  const handleDragEnd = useCallback(() => {
+    setIsDragging(false);
+  }, []);
 
   // Local state
-  const [englishText, setEnglishText] = useState(sentence.englishText);
+  const [englishText, setEnglishText] = useState(sentence.englishText || sentence.text || "");
   const [chineseText, setChineseText] = useState(sentence.chineseText);
   const [enStyle, setEnStyle] = useState<SubtitleStyle>({ ...sentence.style.english });
   const [cnStyle, setCnStyle] = useState<SubtitleStyle>({ ...sentence.style.chinese });
@@ -38,27 +91,34 @@ export default function SentenceEditorModal({
   const [progressHover, setProgressHover] = useState(false);
   const progressRef = useRef<HTMLDivElement>(null);
 
-  // 用于阻断重复初始化的 ref
-  const initDoneRef = useRef(false);
+  const currentIndex = sentences.findIndex((item) => item.id === sentence.id);
+  const canGoPrev = currentIndex > 0;
+  const canGoNext = currentIndex >= 0 && currentIndex < sentences.length - 1;
+  const sentenceDuration = Math.max(sentence.end - sentence.start, 0.01);
+  const sentenceProgress = Math.max(0, Math.min(1, (videoTime - sentence.start) / sentenceDuration));
+  const sentenceProgressTime = sentence.start + sentenceProgress * sentenceDuration;
 
-  // Sync on sentence change - 使用 ref 阻断重复初始化
+  // Sync local editor state when navigating between sentences.
   useEffect(() => {
-    // 只在第一次打开或切换句子时初始化
-    if (!initDoneRef.current) {
-      initDoneRef.current = true;
-      setEnglishText(sentence.englishText);
-      setChineseText(sentence.chineseText);
-      setEnStyle({ ...sentence.style.english });
-      setCnStyle({ ...sentence.style.chinese });
-    }
+    setEnglishText(sentence.englishText || sentence.text || "");
+    setChineseText(sentence.chineseText);
+    setEnStyle({ ...sentence.style.english });
+    setCnStyle({ ...sentence.style.chinese });
   }, [sentence.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // 重置初始化标记（弹窗关闭时）
+  // 监听全局鼠标移动和抬起事件
   useEffect(() => {
-    if (!playing && !showStylePanel) {
-      initDoneRef.current = false;
+    if (isDragging) {
+      const handleMove = (e: MouseEvent) => handleDragMove(e as any);
+      const handleUp = () => handleDragEnd();
+      window.addEventListener("mousemove", handleMove as any);
+      window.addEventListener("mouseup", handleUp);
+      return () => {
+        window.removeEventListener("mousemove", handleMove as any);
+        window.removeEventListener("mouseup", handleUp);
+      };
     }
-  }, [playing, showStylePanel]);
+  }, [isDragging, handleDragMove, handleDragEnd]);
 
   // Save text on blur
   const saveText = useCallback(() => {
@@ -78,12 +138,22 @@ export default function SentenceEditorModal({
     if (Object.keys(updates).length > 0) onUpdate(sentence.id, updates);
   }, [englishText, chineseText, enStyle, cnStyle, sentence.id, sentence.englishText, sentence.chineseText, onUpdate]);
 
+  const navigateSentence = useCallback(
+    (direction: -1 | 1) => {
+      saveAll();
+      if (direction < 0) onSubmitAndPrev();
+      else onSubmitAndNext();
+    },
+    [onSubmitAndNext, onSubmitAndPrev, saveAll]
+  );
+
   // Video AB Loop + time tracking
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
     const handleLoaded = () => {
       video.currentTime = sentence.start;
+      setVideoTime(sentence.start);
       setVideoDur(video.duration || 0);
     };
     const handleTimeUpdate = () => {
@@ -103,6 +173,7 @@ export default function SentenceEditorModal({
     video.addEventListener("play", handlePlay);
     video.addEventListener("pause", handlePause);
     video.currentTime = sentence.start;
+    setVideoTime(sentence.start);
     if (video.duration) setVideoDur(video.duration);
     return () => {
       video.removeEventListener("loadedmetadata", handleLoaded);
@@ -112,6 +183,12 @@ export default function SentenceEditorModal({
       video.removeEventListener("pause", handlePause);
     };
   }, [sentence.id, sentence.start, sentence.end]);
+
+  const handleSingleLineKeyDown = (e: ReactKeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === "Enter" && !e.nativeEvent.isComposing) {
+      e.preventDefault();
+    }
+  };
 
   // Keyboard: Escape closes style panel first, then modal. Ctrl+Enter = submit.
   useEffect(() => {
@@ -140,46 +217,33 @@ export default function SentenceEditorModal({
 
   const handleProgressClick = (e: MouseEvent<HTMLDivElement>) => {
     const v = videoRef.current;
-    if (!v || !videoDur) return;
+    if (!v) return;
     const rect = e.currentTarget.getBoundingClientRect();
     const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
-    v.currentTime = ratio * videoDur;
-  };
-
-  const handleApplyPreset = (preset: StylePreset) => {
-    setEnStyle({ ...preset.english });
-    setCnStyle({ ...preset.chinese });
-    onUpdate(sentence.id, { style: { english: preset.english, chinese: preset.chinese } });
-  };
-
-  const handleSavePreset = () => {
-    const name = presetName.trim();
-    if (!name) return;
-    onSavePreset(name, enStyle, cnStyle);
-    setPresetName("");
+    v.currentTime = sentence.start + ratio * sentenceDuration;
   };
 
   return (
     <div className="modal-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="modal-container">
+      <div className="modal-container" ref={modalRef}>
         {/* Header */}
         <div className="modal-header">
           <div className="modal-header-left">
             <span className="modal-header-title">
               {formatTimeCompact(sentence.start)} → {formatTimeCompact(sentence.end)}
             </span>
-            <span style={{ fontSize: 11, color: "var(--text-secondary)" }}>
-              #{sentences.indexOf(sentence) + 1} / {sentences.length}
+            <span className="modal-header-progress">
+              正在播放：{currentIndex + 1}/{sentences.length}
             </span>
           </div>
           <div className="modal-header-right">
-            <button className={`modal-style-btn${showStylePanel ? " active" : ""}`} onClick={() => setShowStylePanel(!showStylePanel)}>样式</button>
+            <button className={`modal-style-btn${showStylePanel ? " active" : ""}`} onClick={handleToggleStylePanel}>样式</button>
             <button className="modal-close-btn" onClick={() => { saveAll(); onClose(); }}>✕</button>
           </div>
         </div>
 
-        {/* Content: Video + optional Style Panel side by side */}
-        <div className={`modal-content${showStylePanel ? " with-style" : ""}`}>
+        {/* Content: Video only */}
+        <div className="modal-content">
           {/* Video Area */}
           <div className="modal-video-area" key={`${videoSrc}-${sentence.id}`}>
             <video 
@@ -188,6 +252,24 @@ export default function SentenceEditorModal({
               className="modal-video" 
               onClick={handleVideoClick} 
             />
+            <button
+              type="button"
+              className="modal-side-nav modal-side-nav-left"
+              title="上一句"
+              disabled={!canGoPrev || showStylePanel}
+              onClick={(e) => { e.stopPropagation(); navigateSentence(-1); }}
+            >
+              <span className="modal-side-nav-icon">‹</span>
+            </button>
+            <button
+              type="button"
+              className="modal-side-nav modal-side-nav-right"
+              title="下一句"
+              disabled={!canGoNext || showStylePanel}
+              onClick={(e) => { e.stopPropagation(); navigateSentence(1); }}
+            >
+              <span className="modal-side-nav-icon">›</span>
+            </button>
             {/* CSS Subtitle Renderer */}
             <CSSSubtitleRenderer
               englishText={englishText || ""}
@@ -204,28 +286,40 @@ export default function SentenceEditorModal({
               onClick={handleProgressClick}
             >
               <div className="modal-progress-track">
-                {sentence.start > 0 && videoDur > 0 && (
-                  <div className="modal-progress-sentence-range" style={{
-                    left: `${(sentence.start / videoDur) * 100}%`,
-                    width: `${((sentence.end - sentence.start) / videoDur) * 100}%`,
-                  }} />
-                )}
                 <div className="modal-progress-filled" style={{
-                  width: videoDur > 0 ? `${(videoTime / videoDur) * 100}%` : "0%",
+                  width: `${sentenceProgress * 100}%`,
                 }} />
               </div>
               {progressHover && videoDur > 0 && (
                 <div className="modal-progress-time" style={{
-                  left: `${(videoTime / videoDur) * 100}%`,
+                  left: `${sentenceProgress * 100}%`,
                 }}>
-                  {formatTimeCompact(videoTime)}
+                  {formatTimeCompact(sentenceProgressTime)}
                 </div>
               )}
             </div>
           </div>
+        </div>
 
-          {/* Style Panel (side-by-side, not overlay) */}
-          {showStylePanel && (
+        {/* Style Panel (floating, draggable) */}
+        {showStylePanel && (
+          <div
+            className="style-panel-floating"
+            style={{
+              position: "absolute",
+              left: `${panelPos.x}px`,
+              top: `${panelPos.y}px`,
+              zIndex: 40,
+            }}
+          >
+            <div className="style-panel-header-draggable" onMouseDown={handleDragStart}>
+              <button
+                className="style-panel-close"
+                onClick={() => setShowStylePanel(false)}
+              >
+                ✕
+              </button>
+            </div>
             <SubtitleStylePanel
               englishStyle={enStyle}
               chineseStyle={cnStyle}
@@ -236,9 +330,17 @@ export default function SentenceEditorModal({
                   setCnStyle((prev) => ({ ...prev, ...updates }));
                 }
               }}
+              stylePresets={stylePresets}
+              onSavePreset={onSavePreset}
+              onDeletePreset={onDeletePreset}
+              onApplyPreset={(preset) => {
+                setEnStyle({ ...preset.english });
+                setCnStyle({ ...preset.chinese });
+                onUpdate(sentence.id, { style: { english: preset.english, chinese: preset.chinese } });
+              }}
             />
-          )}
-        </div>
+          </div>
+        )}
 
         {/* Input Area */}
         <div className="modal-input-area">
@@ -247,10 +349,12 @@ export default function SentenceEditorModal({
             <textarea
               className="modal-input-field"
               value={englishText}
-              onChange={(e) => setEnglishText(e.target.value)}
+              onChange={(e) => setEnglishText(e.target.value.replace(/[\r\n]+/g, " "))}
               onBlur={saveText}
+              onKeyDown={handleSingleLineKeyDown}
               placeholder="Enter English subtitle..."
               rows={1}
+              wrap="off"
             />
           </div>
           <div className="modal-input-row">
@@ -258,10 +362,12 @@ export default function SentenceEditorModal({
             <textarea
               className="modal-input-field"
               value={chineseText}
-              onChange={(e) => setChineseText(e.target.value)}
+              onChange={(e) => setChineseText(e.target.value.replace(/[\r\n]+/g, " "))}
               onBlur={saveText}
+              onKeyDown={handleSingleLineKeyDown}
               placeholder="输入中文字幕..."
               rows={1}
+              wrap="off"
             />
           </div>
         </div>

@@ -45,6 +45,7 @@ export function useLocalStorage<T>(
 
 // ==================== 项目存储相关 ====================
 const STORAGE_KEY = "echocut-project";
+const PROJECT_PREFIX = "echocut-project-";
 
 function migrateStyle(raw: any): { english: SubtitleStyle; chinese: SubtitleStyle } {
   if (raw?.english && raw?.chinese) {
@@ -63,6 +64,11 @@ function migrateStyle(raw: any): { english: SubtitleStyle; chinese: SubtitleStyl
   return { english: { ...DEFAULT_EN_STYLE }, chinese: { ...DEFAULT_CN_STYLE } };
 }
 
+function inferSentenceHeard(s: any): boolean {
+  if (typeof s?.heard === "boolean") return s.heard;
+  return Boolean(s?.text || s?.label || s?.englishText || s?.chineseText);
+}
+
 function loadProject(): ProjectState {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
@@ -73,7 +79,8 @@ function loadProject(): ProjectState {
             id: s.id,
             start: s.start,
             end: s.end,
-            text: s.text ?? s.label ?? "",
+            heard: inferSentenceHeard(s),
+            text: s.text ?? s.label ?? s.englishText ?? "",
             englishText: s.englishText ?? s.text ?? "",
             chineseText: s.chineseText ?? "",
             style: migrateStyle(s.style),
@@ -98,17 +105,50 @@ function saveProject(state: ProjectState) {
   }
 }
 
-export function useProjectStorage() {
-  const [state, setState] = useState<ProjectState>(loadProject);
-  const savedRef = useRef<string>();
+export function saveProjectForVideo(videoName: string, state: ProjectState) {
+  try {
+    const key = PROJECT_PREFIX + videoName;
+    localStorage.setItem(key, JSON.stringify(state));
+  } catch {
+    // storage full, ignore
+  }
+}
 
-  useEffect(() => {
-    const stateStr = JSON.stringify(state);
-    if (stateStr !== savedRef.current) {
-      savedRef.current = stateStr;
-      saveProject(state);
+export function loadProjectForVideo(videoName: string): ProjectState | null {
+  try {
+    const key = PROJECT_PREFIX + videoName;
+    const raw = localStorage.getItem(key);
+    if (raw) {
+      const data = JSON.parse(raw) as any;
+      const sentences = Array.isArray(data.sentences)
+        ? data.sentences.map((s: any) => ({
+            id: s.id,
+            start: s.start,
+            end: s.end,
+            heard: inferSentenceHeard(s),
+            text: s.text ?? s.label ?? s.englishText ?? "",
+            englishText: s.englishText ?? s.text ?? "",
+            chineseText: s.chineseText ?? "",
+            style: migrateStyle(s.style),
+          }))
+        : [];
+      const stylePresets: StylePreset[] = Array.isArray(data.stylePresets)
+        ? data.stylePresets
+        : [];
+      return { sentences, videoName: data.videoName ?? videoName, stylePresets };
     }
-  }, [state]);
+  } catch {
+    // corrupted data, ignore
+  }
+  return null;
+}
+
+export function hasSavedProject(videoName: string): boolean {
+  return localStorage.getItem(PROJECT_PREFIX + videoName) !== null;
+}
+
+export function useProjectStorage() {
+  const [state, setState] = useState<ProjectState>({ sentences: [], videoName: null, stylePresets: [] });
 
   const setSentences = useCallback((sentences: Sentence[] | ((prev: Sentence[]) => Sentence[])) => {
     setState((prev) => {
@@ -132,5 +172,20 @@ export function useProjectStorage() {
     setState({ sentences: [], videoName: null, stylePresets: [] });
   }, []);
 
-  return { ...state, setSentences, setVideoName, setStylePresets, clearProject };
+  const saveCurrentProject = useCallback(() => {
+    if (state.videoName) {
+      saveProjectForVideo(state.videoName, state);
+    }
+  }, [state]);
+
+  const loadProjectForVideoName = useCallback((videoName: string) => {
+    const saved = loadProjectForVideo(videoName);
+    if (saved) {
+      setState(saved);
+      return true;
+    }
+    return false;
+  }, []);
+
+  return { ...state, setSentences, setVideoName, setStylePresets, clearProject, saveCurrentProject, loadProjectForVideoName };
 }

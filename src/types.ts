@@ -56,6 +56,7 @@ export interface Sentence {
   id: string;
   start: number;
   end: number;
+  heard?: boolean;
   /** @deprecated Use englishText or chineseText instead */
   text: string;
   englishText: string;
@@ -71,6 +72,17 @@ export interface StylePreset {
   name: string;
   english: SubtitleStyle;
   chinese: SubtitleStyle;
+}
+
+export type TimelineIssueType = "gap" | "overlap" | "short";
+
+export interface TimelineIssue {
+  id: string;
+  type: TimelineIssueType;
+  start: number;
+  end: number;
+  label: string;
+  sentenceId?: string;
 }
 
 export type CutPhase = "idle" | "waiting-start" | "start-set";

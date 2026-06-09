@@ -1,4 +1,4 @@
-import { ipcRenderer } from "electron";
+import { ipcRenderer, webUtils } from "electron";
 
 // Expose font API to renderer (contextIsolation: false — direct window assignment)
 (window as any).electronAPI = {
@@ -16,6 +16,9 @@ import { ipcRenderer } from "electron";
   maximize: () => ipcRenderer.send("window-maximize"),
   close: () => ipcRenderer.send("window-close"),
   drag: () => ipcRenderer.send("window-drag"),
+  openProjectDialog: () => ipcRenderer.invoke("open-project-dialog"),
+  saveProjectWithVideo: (defaultName: string, projectData: object, videoSource: object | string) => ipcRenderer.invoke("save-project-with-video", defaultName, projectData, videoSource),
+  getPathForFile: (file: File) => webUtils.getPathForFile(file),
 };
 
 // Font Debug API — passthrough only, no transform

@@ -1,5 +1,5 @@
 import { useRef, useState, useCallback, useEffect, useMemo } from "react";
-import type { Sentence } from "../types";
+import type { Sentence, TimelineIssue } from "../types";
 import { formatTimeCompact } from "../utils/timeFormat";
 import { useThumbnails } from "../hooks/useThumbnails";
 
@@ -12,6 +12,7 @@ interface TimelineProps {
   cutPhase: "idle" | "waiting-start" | "start-set";
   pendingStart: number | null;
   selectedId: string | null;
+  qualityIssues: TimelineIssue[];
   onSeek: (time: number) => void;
   onCut: (time: number, isStart: boolean) => void;
   onSetCutStart: (time: number) => void;
@@ -53,6 +54,7 @@ export default function Timeline({
   cutPhase,
   pendingStart,
   selectedId,
+  qualityIssues,
   onSeek,
   onCut,
   onSetCutStart,
@@ -73,6 +75,8 @@ export default function Timeline({
   const [blockContextMenu, setBlockContextMenu] = useState<{ x: number; y: number; sentenceId: string } | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
   const [generateAllThumbs, setGenerateAllThumbs] = useState(false);
+  // Snap-to sentence endpoint hover state
+  const [snapTarget, setSnapTarget] = useState<{ time: number; type: 'start' | 'end' } | null>(null);
 
   // Pixels per second
   const pps = zoom;
@@ -113,6 +117,17 @@ export default function Timeline({
     useThumbnails(videoSrc, duration, pps, visibleStart, visibleEnd, reloadKey, generateAllThumbs);
 
   const cellThumbs = useMemo(() => getCellThumbs(), [getCellThumbs]);
+
+  const sentenceIssueTypes = useMemo(() => {
+    const issueMap = new Map<string, Set<TimelineIssue["type"]>>();
+    for (const issue of qualityIssues) {
+      if (!issue.sentenceId) continue;
+      const types = issueMap.get(issue.sentenceId) ?? new Set<TimelineIssue["type"]>();
+      types.add(issue.type);
+      issueMap.set(issue.sentenceId, types);
+    }
+    return issueMap;
+  }, [qualityIssues]);
 
   // Snap targets
   const snapTargets = useMemo(() => {
@@ -216,11 +231,41 @@ export default function Timeline({
       if ((e.target as HTMLElement).closest(".tl-block")) return;
       if ((e.target as HTMLElement).closest(".tl-playhead-handle")) return;
       const x = getTrackX(e);
-      const time = xToTime(x);
+      let time = xToTime(x);
 
       if (e.ctrlKey || e.metaKey) {
         e.preventDefault();
-        onCut(snapTime(time), e.button === 0);
+        
+        // Alt + Ctrl/Cmd: snap to nearest sentence endpoint
+        if (e.altKey) {
+          const threshold = SNAP_THRESHOLD_PX / pps * 2;
+          let snappedTime = time;
+          let minDist = threshold;
+          
+          // Find nearest sentence endpoint
+          for (const s of sentences) {
+            // For start point (left click), prefer sentence end points
+            if (e.button === 0) {
+              const dist = Math.abs(time - s.end);
+              if (dist < minDist) {
+                minDist = dist;
+                snappedTime = s.end;
+              }
+            } else {
+              // For end point (right click), prefer sentence start points
+              const dist = Math.abs(time - s.start);
+              if (dist < minDist) {
+                minDist = dist;
+                snappedTime = s.start;
+              }
+            }
+          }
+          time = snappedTime;
+        } else {
+          time = snapTime(time);
+        }
+        
+        onCut(time, e.button === 0);
         return;
       }
       if (e.button !== 0) return;
@@ -232,7 +277,7 @@ export default function Timeline({
       }
       onSeek(time);
     },
-    [getTrackX, xToTime, timeToX, currentTime, onSeek, onCut, snapTime]
+    [getTrackX, xToTime, timeToX, currentTime, onSeek, onCut, snapTime, sentences, pps]
   );
 
   const handleContextMenu = useCallback((e: React.MouseEvent) => {
@@ -347,11 +392,42 @@ export default function Timeline({
   const handleMouseMove = useCallback(
     (e: React.MouseEvent) => {
       if (dragState) return;
-      setHoverTime(xToTime(getTrackX(e)));
+      const x = getTrackX(e);
+      const time = xToTime(x);
+      setHoverTime(time);
+
+      // Check for snap-to endpoint when Alt is pressed
+      if (e.altKey && (e.ctrlKey || e.metaKey)) {
+        const threshold = SNAP_THRESHOLD_PX / pps * 2;
+        let foundTarget: { time: number; type: 'start' | 'end' } | null = null;
+        let minDist = threshold;
+
+        for (const s of sentences) {
+          // Check sentence endpoints
+          const endDist = Math.abs(time - s.end);
+          const startDist = Math.abs(time - s.start);
+
+          if (endDist < minDist) {
+            minDist = endDist;
+            foundTarget = { time: s.end, type: 'end' };
+          }
+          if (startDist < minDist) {
+            minDist = startDist;
+            foundTarget = { time: s.start, type: 'start' };
+          }
+        }
+
+        setSnapTarget(foundTarget);
+      } else {
+        setSnapTarget(null);
+      }
     },
-    [dragState, getTrackX, xToTime]
+    [dragState, getTrackX, xToTime, sentences, pps]
   );
-  const handleMouseLeave = useCallback(() => setHoverTime(null), []);
+  const handleMouseLeave = useCallback(() => {
+    setHoverTime(null);
+    setSnapTarget(null);
+  }, []);
 
   // Wheel: Ctrl=zoom, plain/Shift=horizontal scroll
   useEffect(() => {
@@ -496,6 +572,27 @@ export default function Timeline({
             );
           })}
 
+          {/* Quality markers — derived from sentence timings, non-blocking */}
+          {qualityIssues.map((issue) => {
+            const x = timeToX(issue.start);
+            const w = Math.max(timeToX(issue.end) - x, issue.type === "short" ? 5 : 2);
+            const markerTop = issue.type === "short" ? BLOCK_TOP : RULER_HEIGHT;
+            const markerHeight = issue.type === "short" ? BLOCK_HEIGHT : FILMSTRIP_HEIGHT;
+            return (
+              <div
+                key={issue.id}
+                className={`tl-quality-marker ${issue.type}`}
+                title={issue.label}
+                style={{
+                  left: x,
+                  width: w,
+                  top: markerTop,
+                  height: markerHeight,
+                }}
+              />
+            );
+          })}
+
           {/* Pending start marker */}
           {cutPhase === "start-set" && pendingStart !== null && (
             <div className="tl-pending-start"
@@ -516,22 +613,32 @@ export default function Timeline({
               style={{ left: timeToX(hoverTime), top: 0, height: "100%" }} />
           )}
 
+          {/* Snap-to target indicator */}
+          {snapTarget && !dragState && (
+            <div className="tl-snap-target"
+              style={{ left: timeToX(snapTarget.time), top: 0, height: "100%" }}>
+              <div className="tl-snap-target-line" />
+            </div>
+          )}
+
           {/* Sentence blocks */}
           {sentences.map((s, idx) => {
             const x = timeToX(s.start);
             const w = timeToX(s.end) - x;
             const isSel = s.id === selectedId;
-            const isHeard = !!s.text;
+            const isHeard = s.heard ?? Boolean(s.text || s.englishText || s.chineseText);
+            const blockLabel = s.englishText || s.chineseText || s.text || `S${idx + 1}`;
+            const issueTypes = sentenceIssueTypes.get(s.id);
+            const issueClass = issueTypes ? [...issueTypes].map((type) => `has-${type}`).join(" ") : "";
             return (
               <div 
                 key={s.id} 
-                className={`tl-block ${isSel ? "selected" : ""}`}
+                className={`tl-block ${isHeard ? "heard" : "unheard"} ${isSel ? "selected" : ""} ${issueClass}`}
                 style={{ 
                   left: x, 
                   width: Math.max(w, 4), 
                   top: BLOCK_TOP, 
                   height: BLOCK_HEIGHT,
-                  backgroundColor: isHeard ? "#63b3ed" : "#fc8181",
                 }}
                 onMouseDown={(e) => handleBlockMouseDown(e, s, "body")}
                 onContextMenu={(e) => handleBlockContextMenu(e, s)}
@@ -539,7 +646,7 @@ export default function Timeline({
                 <div className="tl-block-handle left" onMouseDown={(e) => handleBlockMouseDown(e, s, "left")} />
                 <div className="tl-block-handle right" onMouseDown={(e) => handleBlockMouseDown(e, s, "right")} />
                 <div className="tl-block-content">
-                  <span className="tl-block-label">{s.text || `S${idx + 1}`}</span>
+                  <span className="tl-block-label">{blockLabel}</span>
                 </div>
               </div>
             );

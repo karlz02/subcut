@@ -14,6 +14,7 @@ interface Props {
   playbackRate: number;
   sentences?: Sentence[];
   currentTime?: number;
+  showSafeArea?: boolean;
 }
 
 export interface VideoPlayerHandle {
@@ -28,7 +29,7 @@ export interface VideoPlayerHandle {
 }
 
 const VideoPlayer = forwardRef<VideoPlayerHandle, Props>(
-  ({ videoSrc, onTimeUpdate, onDurationChange, onPlay, onPause, onSeek, onAspectRatio, playbackRate, sentences, currentTime }, ref) => {
+  ({ videoSrc, onTimeUpdate, onDurationChange, onPlay, onPause, onSeek, onAspectRatio, playbackRate, sentences, currentTime, showSafeArea = false }, ref) => {
     const videoRef = useRef<HTMLVideoElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
     const [internalTime, setInternalTime] = useState(0);
@@ -80,6 +81,32 @@ const VideoPlayer = forwardRef<VideoPlayerHandle, Props>(
         onDurationChange?.(d);
         if (video.videoWidth > 0 && video.videoHeight > 0) {
           onAspectRatio?.(video.videoWidth / video.videoHeight);
+          // Update video render rect when metadata is loaded
+          const container = containerRef.current;
+          if (container) {
+            const videoWidth = video.videoWidth;
+            const videoHeight = video.videoHeight;
+            const containerWidth = container.clientWidth;
+            const containerHeight = container.clientHeight;
+            const videoAspect = videoWidth / videoHeight;
+            const containerAspect = containerWidth / containerHeight;
+            let renderWidth: number;
+            let renderHeight: number;
+            let offsetX = 0;
+            let offsetY = 0;
+            if (videoAspect > containerAspect) {
+              renderWidth = containerWidth;
+              renderHeight = containerWidth / videoAspect;
+              offsetX = 0;
+              offsetY = (containerHeight - renderHeight) / 2;
+            } else {
+              renderHeight = containerHeight;
+              renderWidth = containerHeight * videoAspect;
+              offsetX = 0;
+              offsetY = (containerHeight - renderHeight) / 2;
+            }
+            setVideoRenderRect({ x: offsetX, y: offsetY, width: renderWidth, height: renderHeight });
+          }
         }
       };
 
@@ -124,18 +151,17 @@ const VideoPlayer = forwardRef<VideoPlayerHandle, Props>(
         let offsetX = 0;
         let offsetY = 0;
 
-        // Always use contain mode with left alignment
         if (videoAspect > containerAspect) {
           // Video is wider than container - fit width
           renderWidth = containerWidth;
           renderHeight = containerWidth / videoAspect;
-          offsetX = 0; // Left aligned
+          offsetX = 0;
           offsetY = (containerHeight - renderHeight) / 2; // Vertically centered
         } else {
           // Video is taller than container - fit height
           renderHeight = containerHeight;
           renderWidth = containerHeight * videoAspect;
-          offsetX = 0; // Left aligned
+          offsetX = 0;
           offsetY = (containerHeight - renderHeight) / 2; // Vertically centered
         }
 
@@ -177,6 +203,8 @@ const VideoPlayer = forwardRef<VideoPlayerHandle, Props>(
     const currentSentence = sentences?.find(
       (s) => displayTime >= s.start && displayTime <= s.end
     );
+    const currentEnglishText = currentSentence?.englishText || currentSentence?.text || "";
+    const currentChineseText = currentSentence?.chineseText || "";
 
     return (
       <div className="video-player" ref={containerRef}>
@@ -184,14 +212,36 @@ const VideoPlayer = forwardRef<VideoPlayerHandle, Props>(
           ref={videoRef}
           src={videoSrc}
           className="video-element"
-          style={{
-            objectFit: "contain",
-            objectPosition: "left center",
-            width: "100%",
-            height: "100%",
-          }}
+          style={videoRenderRect.width > 0 && videoRenderRect.height > 0
+            ? {
+                position: "absolute",
+                left: videoRenderRect.x,
+                top: videoRenderRect.y,
+                width: videoRenderRect.width,
+                height: videoRenderRect.height,
+                objectFit: "fill",
+              }
+            : {
+                objectFit: "contain",
+                objectPosition: "left center",
+                width: "100%",
+                height: "100%",
+              }}
           onClick={handleVideoClick}
         />
+        {showSafeArea && (
+          <div
+            className="video-safe-area"
+            style={{
+              left: videoRenderRect.x,
+              top: videoRenderRect.y,
+              width: videoRenderRect.width || "100%",
+              height: videoRenderRect.height || "100%",
+            }}
+          >
+            <div className="video-safe-area-inner" />
+          </div>
+        )}
         {currentSentence && currentSentence.style?.chinese && currentSentence.style?.english && (
           <div
             className="video-subtitles"
@@ -206,8 +256,8 @@ const VideoPlayer = forwardRef<VideoPlayerHandle, Props>(
             }}
           >
             <CSSSubtitleRenderer
-              englishText={currentSentence.englishText || ""}
-              chineseText={currentSentence.chineseText || ""}
+              englishText={currentEnglishText}
+              chineseText={currentChineseText}
               englishStyle={currentSentence.style.english}
               chineseStyle={currentSentence.style.chinese}
             />
